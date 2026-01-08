@@ -1,0 +1,101 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Core Brand Colors (keeping these for existing custom CSS) */
+  --lazor-neon: #00ff9d;
+  --lazor-neon-dim: rgba(0, 255, 157, 0.1);
+  --lazor-neon-glow: rgba(0, 255, 157, 0.4);
+
+  /* Backgrounds */
+  --bg-dark: #0a0a0a;
+  --bg-card: #141414;
+  --bg-card-hover: #1a1a1a;
+
+  /* Text */
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body {
+  margin: 0;
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  @apply bg-black/60 backdrop-blur-xl border border-white/10;
+  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.4);
+}
+
+.glass-card {
+  @apply bg-white/5 border border-white/5 transition-all duration-200;
+}
+
+.glass-card:hover {
+  @apply bg-white/10 border-white/10 -translate-y-0.5;
+}
+
+/* Text Gradient */
+.text-gradient {
+  background: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Buttons */
+.btn {
+  @apply inline-flex items-center justify-center rounded-xl font-medium text-sm transition-all duration-200 gap-2 relative overflow-hidden outline-none;
+}
+
+.btn-primary {
+  @apply bg-lazor-neon text-black font-semibold hover:-translate-y-px active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none;
+  box-shadow: 0 0 20px rgba(0, 255, 157, 0.3);
+}
+
+.btn-primary:hover {
+  background-color: #33ffb0;
+  box-shadow: 0 0 25px rgba(0, 255, 157, 0.5);
+}
+
+.btn-secondary {
+  @apply bg-white/10 text-white border border-white/5 hover:bg-white/15 hover:border-white/20;
+}
+
+/* Badge */
+.badge {
+  @apply px-2.5 py-1 rounded-full text-xs font-medium uppercase tracking-wider bg-white/10 text-gray-400;
+}
+
+.badge-success {
+  @apply text-lazor-neon;
+  background-color: rgba(0, 255, 157, 0.15);
+  border: 1px solid rgba(0, 255, 157, 0.2);
+}
+
+/* Stats/Info Cards */
+.info-row {
+  @apply flex items-center justify-between p-3 border-b border-white/5 last:border-0;
+}
+
+.info-label {
+  @apply text-gray-400 text-sm;
+}
+
+.info-value {
+  @apply text-white font-medium font-mono text-sm;
+}
