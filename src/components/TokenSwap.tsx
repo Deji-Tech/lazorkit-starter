@@ -1,19 +1,27 @@
 import { useState, useEffect } from 'react';
 import { useWallet } from '@lazorkit/wallet';
+import { transactionStore } from '../utils/transactionStore';
 
-const TOKENS = [
-    { symbol: 'SOL', name: 'Solana', balance: 1.24, price: 150.0, icon: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png' },
-    { symbol: 'USDC', name: 'USD Coin', balance: 0.0, price: 1.0, icon: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png' },
-    { symbol: 'BONK', name: 'Bonk', balance: 500000, price: 0.000012, icon: 'https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I' },
+const INITIAL_TOKENS = [
+    { id: 'sol', symbol: 'SOL', name: 'Solana', balance: 1.24, price: 150.0, icon: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png' },
+    { id: 'usdc', symbol: 'USDC', name: 'USD Coin', balance: 0.0, price: 1.0, icon: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png' },
+    { id: 'bonk', symbol: 'BONK', name: 'Bonk', balance: 500000, price: 0.000012, icon: 'https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I' },
 ];
 
 export function TokenSwap() {
     const { signMessage, isConnected } = useWallet();
+    const [tokens, setTokens] = useState(INITIAL_TOKENS);
+
+    // Select tokens by ID to track them even if array changes
+    const [payTokenId, setPayTokenId] = useState('sol');
+    const [receiveTokenId, setReceiveTokenId] = useState('usdc');
+
     const [payAmount, setPayAmount] = useState('');
     const [receiveAmount, setReceiveAmount] = useState('');
-    const [payToken, setPayToken] = useState(TOKENS[0]);
-    const [receiveToken, setReceiveToken] = useState(TOKENS[1]);
     const [loading, setLoading] = useState(false);
+
+    const payToken = tokens.find(t => t.id === payTokenId) || tokens[0];
+    const receiveToken = tokens.find(t => t.id === receiveTokenId) || tokens[1];
 
     // Simple mock price calculation
     useEffect(() => {
@@ -29,18 +37,43 @@ export function TokenSwap() {
         e.preventDefault();
         if (!isConnected) return;
 
+        // Basic validation
+        if (parseFloat(payAmount) > payToken.balance) {
+            alert('Insufficient balance');
+            return;
+        }
+
         setLoading(true);
         try {
-            // Mock Swap Logic: In a real app, this would build a Jupiter/Raydium transaction
-            // Here we just sign a message to prove interaction
+            // Mock Swap Logic
             if (signMessage) {
                 await signMessage(`Swapping ${payAmount} ${payToken.symbol} to ${receiveAmount} ${receiveToken.symbol}`);
                 alert(`Successfully swapped ${payAmount} ${payToken.symbol} for ${receiveToken.symbol}!`);
             } else {
-                // Fallback for simulation
                 await new Promise(r => setTimeout(r, 2000));
                 alert('Swap executed (Simulated)');
             }
+
+            // UPDATE BALANCE LOCALLY
+            setTokens(prev => prev.map(t => {
+                if (t.id === payTokenId) {
+                    return { ...t, balance: t.balance - parseFloat(payAmount) };
+                }
+                if (t.id === receiveTokenId) {
+                    return { ...t, balance: t.balance + parseFloat(receiveAmount) };
+                }
+                return t;
+            }));
+
+            // SAVE TO HISTORY STORE
+            transactionStore.add({
+                type: 'swapped',
+                amount: `${payAmount}`,
+                token: `${payToken.symbol} → ${receiveToken.symbol}`,
+                description: `Swapped ${payToken.symbol} to ${receiveToken.symbol}`,
+                status: 'simulated'
+            });
+
             setPayAmount('');
         } catch (err) {
             console.error('Swap failed:', err);
@@ -51,8 +84,8 @@ export function TokenSwap() {
     };
 
     const switchTokens = () => {
-        setPayToken(receiveToken);
-        setReceiveToken(payToken);
+        setPayTokenId(receiveTokenId);
+        setReceiveTokenId(payTokenId);
         setPayAmount(receiveAmount);
     };
 
@@ -76,7 +109,7 @@ export function TokenSwap() {
                 <div className="bg-black/40 border border-white/10 rounded-xl p-4 transition-colors hover:border-white/20">
                     <div className="flex justify-between mb-2">
                         <label className="text-xs font-medium text-secondary">You Pay</label>
-                        <span className="text-xs text-secondary">Balance: {payToken.balance}</span>
+                        <span className="text-xs text-secondary">Balance: {payToken.balance.toFixed(4)}</span>
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="flex-1">
@@ -114,7 +147,7 @@ export function TokenSwap() {
                 <div className="bg-black/40 border border-white/10 rounded-xl p-4 transition-colors hover:border-white/20">
                     <div className="flex justify-between mb-2">
                         <label className="text-xs font-medium text-secondary">You Receive</label>
-                        <span className="text-xs text-secondary">Balance: {receiveToken.balance}</span>
+                        <span className="text-xs text-secondary">Balance: {receiveToken.balance.toFixed(4)}</span>
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="flex-1">

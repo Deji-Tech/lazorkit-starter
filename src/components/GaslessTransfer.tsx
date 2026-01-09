@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWallet } from '@lazorkit/wallet';
 import { SystemProgram, PublicKey, LAMPORTS_PER_SOL, Connection, clusterApiUrl } from '@solana/web3.js';
+import { transactionStore } from '../utils/transactionStore';
 
 export function GaslessTransfer() {
     const { signAndSendTransaction, signMessage, smartWalletPubkey, isConnected } = useWallet();
@@ -103,6 +104,18 @@ export function GaslessTransfer() {
             const sig = await signAndSendTransaction({
                 instructions: [transferIx],
                 transactionOptions: options
+            });
+
+            console.log('Transaction confirmed:', sig);
+
+            // SAVE TO HISTORY STORE
+            transactionStore.add({
+                type: 'sent',
+                amount: amount,
+                token: 'SOL',
+                description: `Sent SOL to ${recipient.slice(0, 4)}...${recipient.slice(-4)}`,
+                signature: sig,
+                status: 'success'
             });
 
             setSignature(sig);
