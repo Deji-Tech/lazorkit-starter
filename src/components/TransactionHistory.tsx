@@ -67,9 +67,15 @@ export function TransactionHistory() {
                                         View On-Chain
                                     </a>
                                 ) : (
-                                    <span className="text-[10px] text-gray-400 bg-white/5 px-2 py-0.5 rounded cursor-help" title="This transaction was simulated on Devnet">
-                                        Simulated
-                                    </span>
+                                    <a
+                                        href="https://explorer.solana.com/?cluster=devnet"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-[10px] text-gray-400 hover:text-white hover:underline opacity-60"
+                                        title="Simulated Transaction - View Explorer"
+                                    >
+                                        View Explorer
+                                    </a>
                                 )}
                             </div>
                         </div>

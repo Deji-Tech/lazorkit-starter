@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useWallet } from '@lazorkit/wallet';
 import { SystemProgram, PublicKey, LAMPORTS_PER_SOL, Connection, clusterApiUrl } from '@solana/web3.js';
 import { transactionStore } from '../utils/transactionStore';
+import { tokenStore } from '../utils/tokenStore';
 
 export function GaslessTransfer() {
     const { signAndSendTransaction, signMessage, smartWalletPubkey, isConnected } = useWallet();
@@ -9,8 +10,12 @@ export function GaslessTransfer() {
     const [amount, setAmount] = useState('0.1');
     const [feeMode, setFeeMode] = useState<'paymaster' | 'user'>('paymaster');
 
-    // State for logic & UI
-    const [balance, setBalance] = useState<number | null>(null);
+    // UI state from TokenStore (Virtual Balance)
+    const [balance, setBalance] = useState<number>(() => {
+        const stored = tokenStore.getAll().find(t => t.id === 'sol');
+        return stored ? stored.balance : 0;
+    });
+
     const [loading, setLoading] = useState(false);
     const [airdropLoading, setAirdropLoading] = useState(false);
     const [signature, setSignature] = useState<string | null>(null);
@@ -19,23 +24,35 @@ export function GaslessTransfer() {
 
     const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
 
-    const fetchBalance = useCallback(async () => {
-        if (!smartWalletPubkey) return;
-        try {
-            const lamports = await connection.getBalance(smartWalletPubkey);
-            setBalance(lamports / LAMPORTS_PER_SOL);
-        } catch (e) {
-            console.error('Failed to fetch balance', e);
-        }
-    }, [smartWalletPubkey]);
-
+    // Initial Load: Check if we have a balance in store. If 0 (default), fetch real.
     useEffect(() => {
-        if (isConnected) {
-            fetchBalance();
-            const interval = setInterval(fetchBalance, 10000);
-            return () => clearInterval(interval);
+        if (isConnected && smartWalletPubkey) {
+            const currentStore = tokenStore.getAll().find(t => t.id === 'sol');
+            // If store is default (1.24 mock) or 0, fetch real to hydrate
+            // Ideally we always want to start fresh session with REAL balance if simulation hasn't run yet?
+            // But we want persistence. So we trust store unless it's the static default and real is different.
+            connection.getBalance(smartWalletPubkey).then(lamports => {
+                const real = lamports / LAMPORTS_PER_SOL;
+                // If the store is the default mock value (1.24) and real is different, update it.
+                // Or if store is empty/zero and we have funds.
+                if ((currentStore?.balance === 1.24 && real !== 1.24) || (currentStore?.balance === 0 && real > 0)) {
+                    tokenStore.updateBalance('sol', real);
+                    setBalance(real);
+                }
+            });
         }
-    }, [isConnected, fetchBalance]);
+    }, [isConnected, smartWalletPubkey]);
+
+    // Poll Store for UI (in case Swap changed it)
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const sol = tokenStore.getAll().find(t => t.id === 'sol');
+            if (sol && sol.balance !== balance) {
+                setBalance(sol.balance);
+            }
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [balance]);
 
     const handleAirdrop = async () => {
         if (!smartWalletPubkey) return;
@@ -43,7 +60,13 @@ export function GaslessTransfer() {
         try {
             const sig = await connection.requestAirdrop(smartWalletPubkey, 1 * LAMPORTS_PER_SOL);
             await connection.confirmTransaction(sig);
-            await fetchBalance();
+
+            // Update Store with new Real Balance
+            const newBal = await connection.getBalance(smartWalletPubkey);
+            const val = newBal / LAMPORTS_PER_SOL;
+            tokenStore.updateBalance('sol', val);
+            setBalance(val);
+
         } catch (e) {
             console.error('Airdrop failed', e);
             alert('Airdrop failed. You might be rate-limited by Devnet.');
@@ -81,8 +104,9 @@ export function GaslessTransfer() {
         setSignature(null);
 
         try {
+            // Check Store Balance (Virtual)
             if (balance !== null && parseFloat(amount) > balance && feeMode === 'user') {
-                throw new Error('Insufficient funds. Please request an airdrop first.');
+                throw new Error('Insufficient funds (Simulated).');
             }
 
             const destPubkey = new PublicKey(recipient || '11111111111111111111111111111111');
@@ -108,6 +132,12 @@ export function GaslessTransfer() {
 
             console.log('Transaction confirmed:', sig);
 
+            // Deduct from Store manually to keep simulation in sync
+            // (Real balance also drops, but we update store eagerly)
+            const newBal = balance - parseFloat(amount);
+            tokenStore.updateBalance('sol', newBal);
+            setBalance(newBal);
+
             // SAVE TO HISTORY STORE
             transactionStore.add({
                 type: 'sent',
@@ -119,7 +149,6 @@ export function GaslessTransfer() {
             });
 
             setSignature(sig);
-            await fetchBalance();
         } catch (err: any) {
             console.error('Transfer failed:', err);
             const msg = err.message || 'Transaction rejected';
