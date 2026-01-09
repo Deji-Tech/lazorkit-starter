@@ -32,7 +32,8 @@ export function AIChatbot() {
 
         // 1. Check Balance
         if (text.includes('balance') || text.includes('how much')) {
-            const tokens = tokenStore.getAll();
+            if (!wallet) return "Please connect your wallet first.";
+            const tokens = tokenStore.getAll(wallet.smartWallet);
             const formatted = tokens
                 .map(t => `${t.symbol}: ${t.balance.toFixed(4)} (~$${(t.balance * t.price).toFixed(2)})`)
                 .join('\n');
@@ -42,7 +43,8 @@ export function AIChatbot() {
 
         // 2. Transaction History
         if (text.includes('transaction') || text.includes('history') || text.includes('recent')) {
-            const history = transactionStore.getAll().slice(0, 5);
+            if (!wallet) return "Please connect your wallet first.";
+            const history = transactionStore.getAll(wallet.smartWallet).slice(0, 5);
 
             if (!history.length) {
                 return "No transactions found yet. Try swapping some tokens or sending SOL!";

@@ -14,10 +14,16 @@ export function GaslessTransfer() {
     const [feeMode, setFeeMode] = useState<'paymaster' | 'user'>('paymaster');
 
     // UI state from TokenStore (Virtual Balance)
-    const [balance, setBalance] = useState<number>(() => {
-        const stored = tokenStore.getAll().find(t => t.id === 'sol');
-        return stored ? stored.balance : 0;
-    });
+    // UI state from TokenStore (Virtual Balance)
+    const [balance, setBalance] = useState<number>(0);
+
+    // Initial load from store once wallet is available
+    useEffect(() => {
+        if (smartWalletPubkey) {
+            const stored = tokenStore.getAll(smartWalletPubkey.toBase58()).find(t => t.id === 'sol');
+            setBalance(stored ? stored.balance : 0);
+        }
+    }, [smartWalletPubkey]);
 
     const [loading, setLoading] = useState(false);
     const [airdropLoading, setAirdropLoading] = useState(false);
@@ -30,7 +36,8 @@ export function GaslessTransfer() {
     // Initial Load: Sync Real Balance
     useEffect(() => {
         if (isConnected && smartWalletPubkey) {
-            const currentStore = tokenStore.getAll().find(t => t.id === 'sol');
+            const walletAddr = smartWalletPubkey.toBase58();
+            const currentStore = tokenStore.getAll(walletAddr).find(t => t.id === 'sol');
 
             // Fetch fresh balance from chain
             connection.getBalance(smartWalletPubkey).then(lamports => {
@@ -38,7 +45,7 @@ export function GaslessTransfer() {
 
                 // Only update if significantly different to avoid flickers
                 if ((currentStore?.balance === 1.24 && realBalance !== 1.24) || (currentStore?.balance === 0 && realBalance > 0)) {
-                    tokenStore.updateBalance('sol', realBalance);
+                    tokenStore.updateBalance(walletAddr, 'sol', realBalance);
                     setBalance(realBalance);
                 }
             });
@@ -48,13 +55,15 @@ export function GaslessTransfer() {
     // Poll Store for UI
     useEffect(() => {
         const interval = setInterval(() => {
-            const sol = tokenStore.getAll().find(t => t.id === 'sol');
-            if (sol && sol.balance !== balance) {
-                setBalance(sol.balance);
+            if (smartWalletPubkey) {
+                const sol = tokenStore.getAll(smartWalletPubkey.toBase58()).find(t => t.id === 'sol');
+                if (sol && sol.balance !== balance) {
+                    setBalance(sol.balance);
+                }
             }
         }, 1000);
         return () => clearInterval(interval);
-    }, [balance]);
+    }, [balance, smartWalletPubkey]);
 
     const handleAirdrop = async () => {
         if (!smartWalletPubkey) return;
@@ -66,7 +75,7 @@ export function GaslessTransfer() {
 
             const newBal = await connection.getBalance(smartWalletPubkey);
             const val = newBal / LAMPORTS_PER_SOL;
-            tokenStore.updateBalance('sol', val);
+            tokenStore.updateBalance(smartWalletPubkey.toBase58(), 'sol', val);
             setBalance(val);
             toast.success('Airdrop Successful!', { id: toastId, description: '1 SOL added to your wallet.' });
         } catch (e) {
@@ -140,11 +149,12 @@ export function GaslessTransfer() {
             });
 
             const newBal = balance - parseFloat(amount);
-            tokenStore.updateBalance('sol', newBal);
+            const walletAddr = smartWalletPubkey.toBase58();
+            tokenStore.updateBalance(walletAddr, 'sol', newBal);
             setBalance(newBal);
 
             // Record transaction locally
-            transactionStore.add({
+            transactionStore.add(walletAddr, {
                 type: 'sent',
                 amount: amount,
                 token: 'SOL',
@@ -195,7 +205,7 @@ export function GaslessTransfer() {
                                 try {
                                     const lamports = await connection.getBalance(smartWalletPubkey);
                                     const val = lamports / LAMPORTS_PER_SOL;
-                                    tokenStore.updateBalance('sol', val);
+                                    tokenStore.updateBalance(smartWalletPubkey.toBase58(), 'sol', val);
                                     setBalance(val);
                                     toast.success('Balance Updated', { id: tId });
                                 } catch (e) {

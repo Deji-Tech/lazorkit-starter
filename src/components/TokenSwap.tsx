@@ -7,8 +7,17 @@ import { transactionStore } from '../utils/transactionStore';
 import { tokenStore } from '../utils/tokenStore';
 
 export function TokenSwap() {
-    const { signMessage, isConnected } = useWallet();
-    const [tokens, setTokens] = useState(() => tokenStore.getAll());
+    const { signMessage, isConnected, wallet } = useWallet();
+    const [tokens, setTokens] = useState(() => {
+        return wallet ? tokenStore.getAll(wallet.smartWallet) : [];
+    });
+
+    // Update tokens when wallet connects/changes
+    useEffect(() => {
+        if (wallet) {
+            setTokens(tokenStore.getAll(wallet.smartWallet));
+        }
+    }, [wallet]);
 
     const [payTokenId, setPayTokenId] = useState('sol');
     const [receiveTokenId, setReceiveTokenId] = useState('usdc');
@@ -59,21 +68,23 @@ export function TokenSwap() {
 
             // Update Balance
             let updatedTokens = tokens;
-            updatedTokens = tokenStore.updateBalance(payTokenId, payToken.balance - parseFloat(payAmount));
-            const currentReceive = updatedTokens.find(t => t.id === receiveTokenId);
-            if (currentReceive) {
-                updatedTokens = tokenStore.updateBalance(receiveTokenId, currentReceive.balance + parseFloat(receiveAmount));
-            }
-            setTokens(updatedTokens);
+            if (wallet) {
+                updatedTokens = tokenStore.updateBalance(wallet.smartWallet, payTokenId, payToken.balance - parseFloat(payAmount));
+                const currentReceive = updatedTokens.find(t => t.id === receiveTokenId);
+                if (currentReceive) {
+                    updatedTokens = tokenStore.updateBalance(wallet.smartWallet, receiveTokenId, currentReceive.balance + parseFloat(receiveAmount));
+                }
+                setTokens(updatedTokens);
 
-            // History
-            transactionStore.add({
-                type: 'swapped',
-                amount: `${payAmount}`,
-                token: `${payToken.symbol} → ${receiveToken.symbol}`,
-                description: `Swapped ${payToken.symbol} to ${receiveToken.symbol}`,
-                status: 'simulated'
-            });
+                // History
+                transactionStore.add(wallet.smartWallet, {
+                    type: 'swapped',
+                    amount: `${payAmount}`,
+                    token: `${payToken.symbol} → ${receiveToken.symbol}`,
+                    description: `Swapped ${payToken.symbol} to ${receiveToken.symbol}`,
+                    status: 'simulated'
+                });
+            }
 
             setPayAmount('');
         } catch (err) {

@@ -31,9 +31,11 @@ const DEFAULT_TOKENS: TokenItem[] = [
 ];
 
 export const tokenStore = {
-    getAll: (): TokenItem[] => {
+    getAll: (walletAddress: string): TokenItem[] => {
+        if (!walletAddress) return DEFAULT_TOKENS;
         try {
-            const data = localStorage.getItem(STORAGE_KEY);
+            const key = `${STORAGE_KEY}_${walletAddress}`;
+            const data = localStorage.getItem(key);
             return data ? JSON.parse(data) : DEFAULT_TOKENS;
         } catch (e) {
             console.error('Failed to parse tokens', e);
@@ -41,18 +43,22 @@ export const tokenStore = {
         }
     },
 
-    updateBalance: (tokenId: string, newBalance: number) => {
-        const tokens = tokenStore.getAll();
+    updateBalance: (walletAddress: string, tokenId: string, newBalance: number) => {
+        if (!walletAddress) return [];
+        const tokens = tokenStore.getAll(walletAddress);
 
         const updated = tokens.map(t =>
             t.id === tokenId ? { ...t, balance: newBalance } : t
         );
 
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        const key = `${STORAGE_KEY}_${walletAddress}`;
+        localStorage.setItem(key, JSON.stringify(updated));
         return updated;
     },
 
-    reset: () => {
-        localStorage.removeItem(STORAGE_KEY);
+    reset: (walletAddress: string) => {
+        if (!walletAddress) return;
+        const key = `${STORAGE_KEY}_${walletAddress}`;
+        localStorage.removeItem(key);
     }
 };

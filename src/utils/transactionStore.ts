@@ -17,9 +17,11 @@ const STORAGE_KEY = 'lazorkit_transactions';
  * Persists to localStorage to keep data across reloads.
  */
 export const transactionStore = {
-    getAll: (): TransactionItem[] => {
+    getAll: (walletAddress: string): TransactionItem[] => {
+        if (!walletAddress) return [];
         try {
-            const data = localStorage.getItem(STORAGE_KEY);
+            const key = `${STORAGE_KEY}_${walletAddress}`;
+            const data = localStorage.getItem(key);
             return data ? JSON.parse(data) : [];
         } catch (e) {
             console.error('Failed to parse history', e);
@@ -27,8 +29,10 @@ export const transactionStore = {
         }
     },
 
-    add: (item: Omit<TransactionItem, 'id' | 'date'>) => {
-        const history = transactionStore.getAll();
+    add: (walletAddress: string, item: Omit<TransactionItem, 'id' | 'date'>) => {
+        if (!walletAddress) return null;
+
+        const history = transactionStore.getAll(walletAddress);
 
         const newItem: TransactionItem = {
             ...item,
@@ -40,12 +44,15 @@ export const transactionStore = {
         history.unshift(newItem);
 
         // Limit to last 50 transactions to save space
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(0, 50)));
+        const key = `${STORAGE_KEY}_${walletAddress}`;
+        localStorage.setItem(key, JSON.stringify(history.slice(0, 50)));
 
         return newItem;
     },
 
-    clear: () => {
-        localStorage.removeItem(STORAGE_KEY);
+    clear: (walletAddress: string) => {
+        if (!walletAddress) return;
+        const key = `${STORAGE_KEY}_${walletAddress}`;
+        localStorage.removeItem(key);
     }
 };
