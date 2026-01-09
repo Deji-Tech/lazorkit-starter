@@ -1,16 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useWallet } from '@lazorkit/wallet';
 import { transactionStore } from '../utils/transactionStore';
-
-const INITIAL_TOKENS = [
-    { id: 'sol', symbol: 'SOL', name: 'Solana', balance: 1.24, price: 150.0, icon: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png' },
-    { id: 'usdc', symbol: 'USDC', name: 'USD Coin', balance: 0.0, price: 1.0, icon: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png' },
-    { id: 'bonk', symbol: 'BONK', name: 'Bonk', balance: 500000, price: 0.000012, icon: 'https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I' },
-];
+import { tokenStore } from '../utils/tokenStore';
 
 export function TokenSwap() {
     const { signMessage, isConnected } = useWallet();
-    const [tokens, setTokens] = useState(INITIAL_TOKENS);
+    const [tokens, setTokens] = useState(() => tokenStore.getAll());
 
     // Select tokens by ID to track them even if array changes
     const [payTokenId, setPayTokenId] = useState('sol');
@@ -54,16 +49,19 @@ export function TokenSwap() {
                 alert('Swap executed (Simulated)');
             }
 
-            // UPDATE BALANCE LOCALLY
-            setTokens(prev => prev.map(t => {
-                if (t.id === payTokenId) {
-                    return { ...t, balance: t.balance - parseFloat(payAmount) };
-                }
-                if (t.id === receiveTokenId) {
-                    return { ...t, balance: t.balance + parseFloat(receiveAmount) };
-                }
-                return t;
-            }));
+            // UPDATE BALANCE LOCALLY & PERSIST
+            let updatedTokens = tokens;
+
+            // Deduct
+            updatedTokens = tokenStore.updateBalance(payTokenId, payToken.balance - parseFloat(payAmount));
+
+            // Add
+            const currentReceive = updatedTokens.find(t => t.id === receiveTokenId);
+            if (currentReceive) {
+                updatedTokens = tokenStore.updateBalance(receiveTokenId, currentReceive.balance + parseFloat(receiveAmount));
+            }
+
+            setTokens(updatedTokens);
 
             // SAVE TO HISTORY STORE
             transactionStore.add({

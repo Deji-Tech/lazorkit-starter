@@ -45,7 +45,7 @@ export function TransactionHistory() {
                         <div key={tx.id} className="bg-black/40 border border-white/5 p-4 rounded-xl flex items-center justify-between hover:bg-white/5 transition-colors">
                             <div className="flex items-center gap-3">
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.type === 'swapped' ? 'bg-purple-500/20 text-purple-400' :
-                                    tx.type === 'sent' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'
+                                        tx.type === 'sent' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'
                                     }`}>
                                     {tx.type === 'swapped' && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.29 7 12 12 20.71 7"></polyline><line x1="12" y1="22" x2="12" y2="12"></line></svg>}
                                     {tx.type === 'sent' && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>}
@@ -57,7 +57,7 @@ export function TransactionHistory() {
                             </div>
                             <div className="text-right">
                                 <div className="font-mono font-medium">{tx.type === 'sent' ? '-' : '+'}{tx.amount} {tx.token}</div>
-                                {tx.signature && (
+                                {tx.signature ? (
                                     <a
                                         href={`https://explorer.solana.com/tx/${tx.signature}?cluster=devnet`}
                                         target="_blank"
@@ -66,9 +66,10 @@ export function TransactionHistory() {
                                     >
                                         View On-Chain
                                     </a>
-                                )}
-                                {tx.status === 'simulated' && (
-                                    <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1 rounded ml-1">Simulated</span>
+                                ) : (
+                                    <span className="text-[10px] text-gray-400 bg-white/5 px-2 py-0.5 rounded cursor-help" title="This transaction was simulated on Devnet">
+                                        Simulated
+                                    </span>
                                 )}
                             </div>
                         </div>
