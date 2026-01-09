@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useWallet } from '@lazorkit/wallet';
+import { toast } from 'sonner';
 import { SystemProgram, PublicKey, LAMPORTS_PER_SOL, Connection, clusterApiUrl } from '@solana/web3.js';
+import { useWallet } from '@lazorkit/wallet';
+
+// Stores
 import { transactionStore } from '../utils/transactionStore';
 import { tokenStore } from '../utils/tokenStore';
-import { toast } from 'sonner';
 
 export function GaslessTransfer() {
     const { signAndSendTransaction, signMessage, smartWalletPubkey, isConnected } = useWallet();
@@ -29,11 +31,15 @@ export function GaslessTransfer() {
     useEffect(() => {
         if (isConnected && smartWalletPubkey) {
             const currentStore = tokenStore.getAll().find(t => t.id === 'sol');
+
+            // Fetch fresh balance from chain
             connection.getBalance(smartWalletPubkey).then(lamports => {
-                const real = lamports / LAMPORTS_PER_SOL;
-                if ((currentStore?.balance === 1.24 && real !== 1.24) || (currentStore?.balance === 0 && real > 0)) {
-                    tokenStore.updateBalance('sol', real);
-                    setBalance(real);
+                const realBalance = lamports / LAMPORTS_PER_SOL;
+
+                // Only update if significantly different to avoid flickers
+                if ((currentStore?.balance === 1.24 && realBalance !== 1.24) || (currentStore?.balance === 0 && realBalance > 0)) {
+                    tokenStore.updateBalance('sol', realBalance);
+                    setBalance(realBalance);
                 }
             });
         }
@@ -137,11 +143,12 @@ export function GaslessTransfer() {
             tokenStore.updateBalance('sol', newBal);
             setBalance(newBal);
 
+            // Record transaction locally
             transactionStore.add({
                 type: 'sent',
                 amount: amount,
                 token: 'SOL',
-                description: `Sent SOL to ${recipient.slice(0, 4)}...${recipient.slice(-4)}`,
+                description: `Sent SOL to ${recipient.slice(0, 4)}...`,
                 signature: sig,
                 status: 'success'
             });

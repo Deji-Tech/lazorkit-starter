@@ -1,8 +1,10 @@
-import { useWallet } from '@lazorkit/wallet';
 import { useState, useRef, useEffect } from 'react';
+import { toast } from 'sonner';
+import { useWallet } from '@lazorkit/wallet';
+
+// Utilities
 import { tokenStore } from '../utils/tokenStore';
 import { transactionStore } from '../utils/transactionStore';
-import { toast } from 'sonner';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -18,57 +20,66 @@ export function AIChatbot() {
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
+    // Auto-scroll to bottom of chat
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
+    // Simple intent matching logic
+    // In a production app, this would call an LLM API
     const processQuery = async (query: string): Promise<string> => {
-        const lowerQuery = query.toLowerCase();
+        const text = query.toLowerCase();
 
-        // Balance queries
-        if (lowerQuery.includes('balance') || lowerQuery.includes('how much')) {
+        // 1. Check Balance
+        if (text.includes('balance') || text.includes('how much')) {
             const tokens = tokenStore.getAll();
-            const balanceList = tokens.map(t => `${t.symbol}: ${t.balance.toFixed(4)} (~$${(t.balance * t.price).toFixed(2)})`).join('\n');
-            return `Here are your current balances:\n\n${balanceList}\n\nThese are simulated balances on Devnet. Use the refresh button on the Transfer tab to sync with on-chain data.`;
+            const formatted = tokens
+                .map(t => `${t.symbol}: ${t.balance.toFixed(4)} (~$${(t.balance * t.price).toFixed(2)})`)
+                .join('\n');
+
+            return `Here are your current balances (Devnet):\n\n${formatted}\n\nTip: Use the refresh button in the 'Send' tab to sync with the blockchain.`;
         }
 
-        // Transaction history
-        if (lowerQuery.includes('transaction') || lowerQuery.includes('history') || lowerQuery.includes('recent')) {
-            const txs = transactionStore.getAll().slice(0, 5);
-            if (txs.length === 0) {
-                return "You don't have any transactions yet. Try making a swap or sending some SOL!";
+        // 2. Transaction History
+        if (text.includes('transaction') || text.includes('history') || text.includes('recent')) {
+            const history = transactionStore.getAll().slice(0, 5);
+
+            if (!history.length) {
+                return "No transactions found yet. Try swapping some tokens or sending SOL!";
             }
-            const txList = txs.map(tx => `• ${tx.type}: ${tx.amount} ${tx.token} (${tx.status})`).join('\n');
-            return `Here are your recent transactions:\n\n${txList}\n\nCheck the History tab for more details.`;
+
+            const list = history
+                .map(tx => `• ${tx.type}: ${tx.amount} ${tx.token} (${tx.status})`)
+                .join('\n');
+
+            return `Here are your last 5 transactions:\n\n${list}\n\nCheck the History tab for the full list.`;
         }
 
-        // Wallet address
-        if (lowerQuery.includes('address') || lowerQuery.includes('wallet')) {
-            return `Your wallet address is:\n\n\`${wallet?.smartWallet}\`\n\nYou can share this to receive SOL or NFTs. Check the Receive tab for a QR code!`;
+        // 3. Wallet Address
+        if (text.includes('address') || text.includes('wallet')) {
+            return `Your wallet address is:\n\`${wallet?.smartWallet}\`\n\nShare this to receive funds. You can also view your QR code in the 'Receive' tab.`;
         }
 
-        // Swap help
-        if (lowerQuery.includes('swap') || lowerQuery.includes('exchange') || lowerQuery.includes('trade')) {
-            return "To swap tokens, go to the **Swap** tab. Select the token you want to pay with, enter an amount, and click Swap. The conversion rate is calculated automatically.\n\nNote: Swaps are currently simulated on Devnet.";
+        // 4. Usage Help (Swap/Send)
+        if (text.includes('swap') || text.includes('exchange')) {
+            return "To swap tokens:\n1. Go to the **Swap** tab\n2. Select your tokens\n3. Enter amount and confirm\n\nNote: Swaps are currently simulated for demo purposes.";
         }
 
-        // Send help
-        if (lowerQuery.includes('send') || lowerQuery.includes('transfer')) {
-            return "To send SOL, go to the **Transfer** tab:\n1. Enter a recipient address\n2. Enter the amount\n3. Choose Gasless (Paymaster sponsors fees) or Pay with SOL\n4. Click Send!\n\nPasskey confirmation will be required.";
+        if (text.includes('send') || text.includes('transfer')) {
+            return "To send funds:\n1. Go to the **Transfer** tab\n2. Enter recipient & amount\n3. Choose 'Gasless' (sponsored) or 'Pay with SOL'\n4. Confirm with your biometric passkey";
         }
 
-        // NFT help
-        if (lowerQuery.includes('nft') || lowerQuery.includes('collectible')) {
-            return "Check the **NFTs** tab to see your digital collectibles! If you don't have any NFTs yet, you'll see sample items. On mainnet, your real NFTs will appear here.";
+        // 5. Educational (NFTs/Security)
+        if (text.includes('nft') || text.includes('collectible')) {
+            return "Your NFTs are in the **NFTs** tab. Click on any item to view details or send it to a friend (gasless transfers included!).";
         }
 
-        // Passkey / security
-        if (lowerQuery.includes('passkey') || lowerQuery.includes('security') || lowerQuery.includes('biometric')) {
-            return "This wallet uses **Passkeys** (WebAuthn) for security. Your private key is protected by your device's biometric sensor (Face ID, fingerprint) or security key.\n\n✅ No seed phrases to remember\n✅ Hardware-level security\n✅ Works across devices with iCloud/Google sync";
+        if (text.includes('passkey') || text.includes('security')) {
+            return "This wallet is secured by **Passkeys** (WebAuthn). Your private keys never leave your device's secure enclave (FaceID/TouchID), making it phishing-resistant.";
         }
 
-        // Fallback
-        return "I can help you with:\n• **Balance** - Check your token balances\n• **Transactions** - View recent activity\n• **Swap** - How to exchange tokens\n• **Send** - How to transfer SOL\n• **NFTs** - View your collectibles\n• **Security** - Learn about passkeys\n\nWhat would you like to know?";
+        // Default Fallback
+        return "I can help with:\n• Checking balances & history\n• Explaining how to Swap/Send\n• Wallet security info\n\nWhat would you like to know?";
     };
 
     const handleSend = async () => {
@@ -111,8 +122,8 @@ export function AIChatbot() {
                 {messages.map((msg, i) => (
                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[85%] p-3 rounded-2xl text-sm whitespace-pre-wrap ${msg.role === 'user'
-                                ? 'bg-lazor-neon text-black rounded-br-sm'
-                                : 'bg-white/10 text-white rounded-bl-sm'
+                            ? 'bg-lazor-neon text-black rounded-br-sm'
+                            : 'bg-white/10 text-white rounded-bl-sm'
                             }`}>
                             {msg.content}
                         </div>

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { useWallet } from '@lazorkit/wallet';
+
+// State Management
 import { transactionStore } from '../utils/transactionStore';
 import { tokenStore } from '../utils/tokenStore';
-import { toast } from 'sonner';
 
 export function TokenSwap() {
     const { signMessage, isConnected } = useWallet();
@@ -21,13 +23,17 @@ export function TokenSwap() {
     const payToken = tokens.find(t => t.id === payTokenId) || tokens[0];
     const receiveToken = tokens.find(t => t.id === receiveTokenId) || tokens[1];
 
+    // Auto-calculate receive amount based on price ratio
     useEffect(() => {
         if (!payAmount) {
             setReceiveAmount('');
             return;
         }
-        const rate = payToken.price / receiveToken.price;
-        setReceiveAmount((parseFloat(payAmount) * rate).toFixed(6));
+
+        const priceRatio = payToken.price / receiveToken.price;
+        const calculatedAmount = parseFloat(payAmount) * priceRatio;
+
+        setReceiveAmount(calculatedAmount.toFixed(6));
     }, [payAmount, payToken, receiveToken]);
 
     const handleSwap = async (e: React.FormEvent) => {

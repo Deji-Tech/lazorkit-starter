@@ -1,8 +1,8 @@
-import { useWallet } from '@lazorkit/wallet';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { PublicKey } from '@solana/web3.js';
 import { createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
+import { useWallet } from '@lazorkit/wallet';
 
 interface NFTItem {
     id: string;
@@ -54,15 +54,19 @@ export function NFTGallery() {
                             mint: item.id
                         }));
                     setNfts(parsed);
+                    setNfts(parsed);
                 } else {
-                    setNfts([
+                    // Fallback to demo NFTs if wallet is empty
+                    const demoNfts = [
                         { id: '1', name: 'Cosmic Dreamer #42', image: 'https://picsum.photos/seed/nft1/400/400', collection: 'Cosmic Collection', mint: 'demo1' },
                         { id: '2', name: 'Ocean Serenity #18', image: 'https://picsum.photos/seed/nft2/400/400', collection: 'Nature Series', mint: 'demo2' },
                         { id: '3', name: 'Golden Horizon #7', image: 'https://picsum.photos/seed/nft3/400/400', collection: 'Sunset Dreams', mint: 'demo3' },
-                    ]);
+                    ];
+                    setNfts(demoNfts);
                 }
             } catch (e) {
                 console.error('Failed to fetch NFTs:', e);
+                // Graceful fallback on error
                 setNfts([
                     { id: '1', name: 'Cosmic Dreamer #42', image: 'https://picsum.photos/seed/nft1/400/400', collection: 'Cosmic Collection', mint: 'demo1' },
                     { id: '2', name: 'Ocean Serenity #18', image: 'https://picsum.photos/seed/nft2/400/400', collection: 'Nature Series', mint: 'demo2' },
