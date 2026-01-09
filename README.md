@@ -4,22 +4,22 @@
 
 ![LazorKit Starter Preview](https://github.com/lazorkit/assets/raw/main/starter-preview-v2.png)
 
-## 🚀 Live Demo
+##  Live Demo
 
 **[View Live Deployment](https://lazorkit-starter.netlify.app)**
 *(Use your device's biometric sensor to login - no seed phrase required)*
 
 ---
 
-## ✨ Features
+##  Features
 
-- 🔐 **Passkey Authentication**: Secure, biometric onboarding via FaceID/TouchID (WebAuthn).
-- ⛽ **Gasless Transactions**: Native Kora Paymaster integration to sponsor user gas fees.
-- 🤖 **AI Wallet Assistant**: Conversational interface for checking balances and asking identifying questions.
-- 🖼️ **NFT Gallery**: Visual gallery with "Slide-to-Top" interaction and gasless sending.
-- 🔄 **Token Swaps**: Built-in token selector and swap interface (Simulated on Devnet).
-- 💾 **Session Persistence**: Robust `localStorage` management for history and sessions.
-- 📱 **Premium UI**:  Glassmorphism design, smooth 6-tab navigation, and Sonner notifications.
+-  **Passkey Authentication**: Secure, biometric onboarding via FaceID/TouchID (WebAuthn).
+-  **Gasless Transactions**: Native Kora Paymaster integration to sponsor user gas fees.
+-  **AI Wallet Assistant**: Conversational interface for checking balances and asking identifying questions.
+-  **NFT Gallery**: Visual gallery with "Slide-to-Top" interaction and gasless sending.
+-  **Token Swaps**: Built-in token selector and swap interface (Simulated on Devnet).
+-  **Session Persistence**: Robust `localStorage` management for history and sessions.
+-  **Premium UI**:  Glassmorphism design, smooth 6-tab navigation, and Sonner notifications.
 
 ---
 
@@ -33,7 +33,7 @@
 
 ---
 
-## 📚 Quick Start
+##  Quick Start
 
 ### 1. Installation
 
@@ -73,7 +73,7 @@ Open [http://localhost:5173](http://localhost:5173) to view the app.
 
 ---
 
-## 📖 Step-by-Step Tutorials
+##  Step-by-Step Tutorials
 
 We have included detailed guides to help you understand the integration:
 
@@ -88,7 +88,7 @@ We have included detailed guides to help you understand the integration:
 
 ---
 
-## 📂 Project Structure
+##  Project Structure
 
 ```bash
 src/
