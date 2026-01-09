@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { transactionStore, type TransactionItem } from '../utils/transactionStore';
 
 export function TransactionHistory() {
-    const { isConnected } = useWallet();
+    const { isConnected, wallet } = useWallet();
     const [transactions, setTransactions] = useState<TransactionItem[]>([]);
 
     useEffect(() => {
@@ -68,13 +68,13 @@ export function TransactionHistory() {
                                     </a>
                                 ) : (
                                     <a
-                                        href="https://explorer.solana.com/?cluster=devnet"
+                                        href={`https://explorer.solana.com/address/${wallet?.smartWallet || ''}?cluster=devnet`}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="text-[10px] text-gray-400 hover:text-white hover:underline opacity-60"
-                                        title="Simulated Transaction - View Explorer"
+                                        className="text-[10px] text-gray-500 hover:text-white hover:underline opacity-60"
+                                        title="Simulated Transaction - View Wallet History"
                                     >
-                                        View Explorer
+                                        View Wallet (Simulated)
                                     </a>
                                 )}
                             </div>
