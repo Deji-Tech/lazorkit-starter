@@ -1,18 +1,25 @@
 import { useWallet } from '@lazorkit/wallet';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { PublicKey } from '@solana/web3.js';
+import { createTransferInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 
 interface NFTItem {
     id: string;
     name: string;
     image: string;
     collection?: string;
+    mint?: string;
 }
 
 export function NFTGallery() {
-    const { wallet, isConnected } = useWallet();
+    const { wallet, isConnected, signAndSendTransaction, smartWalletPubkey } = useWallet();
     const [nfts, setNfts] = useState<NFTItem[]>([]);
     const [loading, setLoading] = useState(false);
+    const [selectedNft, setSelectedNft] = useState<NFTItem | null>(null);
+    const [sendMode, setSendMode] = useState(false);
+    const [recipient, setRecipient] = useState('');
+    const [sending, setSending] = useState(false);
 
     useEffect(() => {
         if (!isConnected || !wallet) return;
@@ -20,8 +27,6 @@ export function NFTGallery() {
         const fetchNFTs = async () => {
             setLoading(true);
             try {
-                // Using Helius DAS API for NFT fetching
-                // For demo, we'll use a public endpoint with rate limits
                 const response = await fetch(`https://mainnet.helius-rpc.com/?api-key=demo`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -46,24 +51,23 @@ export function NFTGallery() {
                             id: item.id,
                             name: item.content?.metadata?.name || 'Unnamed NFT',
                             image: item.content?.files?.[0]?.uri || '',
-                            collection: item.grouping?.[0]?.group_value || undefined
+                            collection: item.grouping?.[0]?.group_value || undefined,
+                            mint: item.id
                         }));
                     setNfts(parsed);
                 } else {
-                    // Demo: Show sample NFTs if none found
                     setNfts([
-                        { id: '1', name: 'Sample NFT #1', image: 'https://picsum.photos/seed/nft1/300/300', collection: 'Demo Collection' },
-                        { id: '2', name: 'Sample NFT #2', image: 'https://picsum.photos/seed/nft2/300/300', collection: 'Demo Collection' },
-                        { id: '3', name: 'Sample NFT #3', image: 'https://picsum.photos/seed/nft3/300/300', collection: 'Demo Collection' },
+                        { id: '1', name: 'Sample NFT #1', image: 'https://picsum.photos/seed/nft1/300/300', collection: 'Demo Collection', mint: 'demo1' },
+                        { id: '2', name: 'Sample NFT #2', image: 'https://picsum.photos/seed/nft2/300/300', collection: 'Demo Collection', mint: 'demo2' },
+                        { id: '3', name: 'Sample NFT #3', image: 'https://picsum.photos/seed/nft3/300/300', collection: 'Demo Collection', mint: 'demo3' },
                     ]);
                 }
             } catch (e) {
                 console.error('Failed to fetch NFTs:', e);
-                // Fallback to demo NFTs
                 setNfts([
-                    { id: '1', name: 'Sample NFT #1', image: 'https://picsum.photos/seed/nft1/300/300', collection: 'Demo Collection' },
-                    { id: '2', name: 'Sample NFT #2', image: 'https://picsum.photos/seed/nft2/300/300', collection: 'Demo Collection' },
-                    { id: '3', name: 'Sample NFT #3', image: 'https://picsum.photos/seed/nft3/300/300', collection: 'Demo Collection' },
+                    { id: '1', name: 'Sample NFT #1', image: 'https://picsum.photos/seed/nft1/300/300', collection: 'Demo Collection', mint: 'demo1' },
+                    { id: '2', name: 'Sample NFT #2', image: 'https://picsum.photos/seed/nft2/300/300', collection: 'Demo Collection', mint: 'demo2' },
+                    { id: '3', name: 'Sample NFT #3', image: 'https://picsum.photos/seed/nft3/300/300', collection: 'Demo Collection', mint: 'demo3' },
                 ]);
             } finally {
                 setLoading(false);
@@ -72,6 +76,86 @@ export function NFTGallery() {
 
         fetchNFTs();
     }, [isConnected, wallet]);
+
+    const handleSendNft = async () => {
+        if (!selectedNft || !recipient || !smartWalletPubkey || !signAndSendTransaction) return;
+
+        // Check if demo NFT
+        if (selectedNft.mint?.startsWith('demo')) {
+            toast.error('Demo NFT', { description: 'This is a sample NFT and cannot be transferred.' });
+            return;
+        }
+
+        setSending(true);
+        const toastId = toast.loading('Preparing NFT transfer...');
+
+        try {
+            const mintPubkey = new PublicKey(selectedNft.mint!);
+            const recipientPubkey = new PublicKey(recipient);
+
+            // Get associated token accounts
+            const fromAta = await getAssociatedTokenAddress(mintPubkey, smartWalletPubkey);
+            const toAta = await getAssociatedTokenAddress(mintPubkey, recipientPubkey);
+
+            // Build instructions array - create destination ATA if needed
+            const instructions: any[] = [];
+
+            // Create ATA for recipient if it doesn't exist
+            instructions.push(
+                createAssociatedTokenAccountInstruction(
+                    smartWalletPubkey,
+                    toAta,
+                    recipientPubkey,
+                    mintPubkey
+                )
+            );
+
+            // Transfer the NFT (1 token since NFTs have 0 decimals)
+            instructions.push(
+                createTransferInstruction(
+                    fromAta,
+                    toAta,
+                    smartWalletPubkey,
+                    1
+                )
+            );
+
+            const sig = await signAndSendTransaction({
+                instructions,
+                transactionOptions: {
+                    computeUnitLimit: 300_000,
+                    feeToken: 'paymaster'
+                }
+            });
+
+            toast.success('NFT Sent!', {
+                id: toastId,
+                description: `${selectedNft.name} transferred successfully`,
+                action: {
+                    label: 'Explorer',
+                    onClick: () => window.open(`https://explorer.solana.com/tx/${sig}?cluster=devnet`, '_blank')
+                }
+            });
+
+            // Remove from local list
+            setNfts(prev => prev.filter(n => n.id !== selectedNft.id));
+            setSelectedNft(null);
+            setSendMode(false);
+            setRecipient('');
+
+        } catch (err: any) {
+            console.error('NFT transfer failed:', err);
+            toast.error('Transfer Failed', { id: toastId, description: err.message || 'Could not send NFT' });
+        } finally {
+            setSending(false);
+        }
+    };
+
+    const closeModal = () => {
+        setSelectedNft(null);
+        setSendMode(false);
+        setRecipient('');
+    };
 
     if (!isConnected) return null;
 
@@ -107,7 +191,7 @@ export function NFTGallery() {
                         <div
                             key={nft.id}
                             className="group relative aspect-square rounded-xl overflow-hidden bg-black/40 border border-white/5 hover:border-lazor/50 transition-all cursor-pointer"
-                            onClick={() => toast.info(nft.name, { description: nft.collection || 'No collection' })}
+                            onClick={() => setSelectedNft(nft)}
                         >
                             <img
                                 src={nft.image}
@@ -120,6 +204,88 @@ export function NFTGallery() {
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* NFT Detail Modal */}
+            {selectedNft && (
+                <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+                    <div className="w-full max-w-md bg-[#1a1b1f] border border-white/10 rounded-2xl overflow-hidden">
+                        {/* Image */}
+                        <div className="relative aspect-square">
+                            <img
+                                src={selectedNft.image}
+                                alt={selectedNft.name}
+                                className="w-full h-full object-cover"
+                            />
+                            <button
+                                onClick={closeModal}
+                                className="absolute top-4 right-4 bg-black/60 hover:bg-black/80 p-2 rounded-full transition-colors"
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Details */}
+                        <div className="p-6">
+                            <h3 className="text-xl font-bold mb-1">{selectedNft.name}</h3>
+                            {selectedNft.collection && (
+                                <p className="text-sm text-secondary mb-4">{selectedNft.collection}</p>
+                            )}
+
+                            {!sendMode ? (
+                                <button
+                                    onClick={() => setSendMode(true)}
+                                    className="w-full btn btn-primary h-12"
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-2">
+                                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                    </svg>
+                                    Send NFT
+                                </button>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-xs text-secondary mb-1 block">Recipient Address</label>
+                                        <input
+                                            type="text"
+                                            value={recipient}
+                                            onChange={(e) => setRecipient(e.target.value)}
+                                            placeholder="Enter Solana address..."
+                                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-lazor-neon/50 font-mono text-sm"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setSendMode(false)}
+                                            className="flex-1 btn btn-secondary h-12"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleSendNft}
+                                            disabled={sending || !recipient}
+                                            className="flex-1 btn btn-primary h-12 disabled:opacity-50"
+                                        >
+                                            {sending ? (
+                                                <span className="flex items-center gap-2">
+                                                    <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></span>
+                                                    Sending...
+                                                </span>
+                                            ) : 'Confirm Send'}
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-center text-secondary">
+                                        Transaction will be gasless via Paymaster
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
