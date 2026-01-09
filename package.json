@@ -11,8 +11,10 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
+    "@jup-ag/api": "^6.0.48",
     "@lazorkit/wallet": "^2.0.1",
     "@solana/web3.js": "^1.98.4",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "sonner": "^2.0.7",
