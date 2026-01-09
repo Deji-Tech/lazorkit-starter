@@ -16,7 +16,7 @@ export function NFTGallery() {
     const { wallet, isConnected, signAndSendTransaction, smartWalletPubkey } = useWallet();
     const [nfts, setNfts] = useState<NFTItem[]>([]);
     const [loading, setLoading] = useState(false);
-    const [sendingId, setSendingId] = useState<string | null>(null);
+    const [selectedNft, setSelectedNft] = useState<NFTItem | null>(null);
     const [recipient, setRecipient] = useState('');
     const [sending, setSending] = useState(false);
 
@@ -56,17 +56,17 @@ export function NFTGallery() {
                     setNfts(parsed);
                 } else {
                     setNfts([
-                        { id: '1', name: 'Sample NFT #1', image: 'https://picsum.photos/seed/nft1/300/300', collection: 'Demo Collection', mint: 'demo1' },
-                        { id: '2', name: 'Sample NFT #2', image: 'https://picsum.photos/seed/nft2/300/300', collection: 'Demo Collection', mint: 'demo2' },
-                        { id: '3', name: 'Sample NFT #3', image: 'https://picsum.photos/seed/nft3/300/300', collection: 'Demo Collection', mint: 'demo3' },
+                        { id: '1', name: 'Cosmic Dreamer #42', image: 'https://picsum.photos/seed/nft1/400/400', collection: 'Cosmic Collection', mint: 'demo1' },
+                        { id: '2', name: 'Ocean Serenity #18', image: 'https://picsum.photos/seed/nft2/400/400', collection: 'Nature Series', mint: 'demo2' },
+                        { id: '3', name: 'Golden Horizon #7', image: 'https://picsum.photos/seed/nft3/400/400', collection: 'Sunset Dreams', mint: 'demo3' },
                     ]);
                 }
             } catch (e) {
                 console.error('Failed to fetch NFTs:', e);
                 setNfts([
-                    { id: '1', name: 'Sample NFT #1', image: 'https://picsum.photos/seed/nft1/300/300', collection: 'Demo Collection', mint: 'demo1' },
-                    { id: '2', name: 'Sample NFT #2', image: 'https://picsum.photos/seed/nft2/300/300', collection: 'Demo Collection', mint: 'demo2' },
-                    { id: '3', name: 'Sample NFT #3', image: 'https://picsum.photos/seed/nft3/300/300', collection: 'Demo Collection', mint: 'demo3' },
+                    { id: '1', name: 'Cosmic Dreamer #42', image: 'https://picsum.photos/seed/nft1/400/400', collection: 'Cosmic Collection', mint: 'demo1' },
+                    { id: '2', name: 'Ocean Serenity #18', image: 'https://picsum.photos/seed/nft2/400/400', collection: 'Nature Series', mint: 'demo2' },
+                    { id: '3', name: 'Golden Horizon #7', image: 'https://picsum.photos/seed/nft3/400/400', collection: 'Sunset Dreams', mint: 'demo3' },
                 ]);
             } finally {
                 setLoading(false);
@@ -76,10 +76,10 @@ export function NFTGallery() {
         fetchNFTs();
     }, [isConnected, wallet]);
 
-    const handleSendNft = async (nft: NFTItem) => {
-        if (!recipient || !smartWalletPubkey || !signAndSendTransaction) return;
+    const handleSendNft = async () => {
+        if (!selectedNft || !recipient || !smartWalletPubkey || !signAndSendTransaction) return;
 
-        if (nft.mint?.startsWith('demo')) {
+        if (selectedNft.mint?.startsWith('demo')) {
             toast.error('Demo NFT', { description: 'This is a sample NFT and cannot be transferred.' });
             return;
         }
@@ -88,7 +88,7 @@ export function NFTGallery() {
         const toastId = toast.loading('Sending NFT...');
 
         try {
-            const mintPubkey = new PublicKey(nft.mint!);
+            const mintPubkey = new PublicKey(selectedNft.mint!);
             const recipientPubkey = new PublicKey(recipient);
 
             const fromAta = await getAssociatedTokenAddress(mintPubkey, smartWalletPubkey);
@@ -119,15 +119,15 @@ export function NFTGallery() {
 
             toast.success('NFT Sent!', {
                 id: toastId,
-                description: `${nft.name} transferred`,
+                description: `${selectedNft.name} transferred`,
                 action: {
                     label: 'Explorer',
                     onClick: () => window.open(`https://explorer.solana.com/tx/${sig}?cluster=devnet`, '_blank')
                 }
             });
 
-            setNfts(prev => prev.filter(n => n.id !== nft.id));
-            setSendingId(null);
+            setNfts(prev => prev.filter(n => n.id !== selectedNft.id));
+            setSelectedNft(null);
             setRecipient('');
 
         } catch (err: any) {
@@ -137,6 +137,21 @@ export function NFTGallery() {
             setSending(false);
         }
     };
+
+    const selectNft = (nft: NFTItem) => {
+        if (selectedNft?.id === nft.id) {
+            setSelectedNft(null);
+            setRecipient('');
+        } else {
+            setSelectedNft(nft);
+            setRecipient('');
+        }
+    };
+
+    // Reorder NFTs so selected one is first
+    const orderedNfts = selectedNft
+        ? [selectedNft, ...nfts.filter(n => n.id !== selectedNft.id)]
+        : nfts;
 
     if (!isConnected) return null;
 
@@ -163,60 +178,103 @@ export function NFTGallery() {
                             <polyline points="21 15 16 10 5 21"></polyline>
                         </svg>
                     </div>
-                    <p className="text-secondary">No NFTs found in this wallet</p>
+                    <p className="text-secondary">No NFTs found</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-3 gap-3 relative">
-                    {nfts.map(nft => (
-                        <div key={nft.id} className="relative">
-                            <div className="group aspect-square rounded-xl overflow-hidden bg-black/40 border border-white/5 hover:border-lazor/50 transition-all">
+                <div className="space-y-4">
+                    {/* Selected NFT - Expanded View */}
+                    {selectedNft && (
+                        <div className="flex gap-4 bg-black/40 border border-lazor/30 rounded-xl p-4 animate-fade-in">
+                            {/* NFT Image - Left Side */}
+                            <div className="w-32 h-32 shrink-0 rounded-xl overflow-hidden border-2 border-lazor/50 shadow-lg shadow-lazor/20">
+                                <img
+                                    src={selectedNft.image}
+                                    alt={selectedNft.name}
+                                    className="w-full h-full object-cover"
+                                />
+                            </div>
+
+                            {/* Controls - Right Side */}
+                            <div className="flex-1 flex flex-col justify-between min-w-0">
+                                <div>
+                                    <h4 className="font-bold text-white truncate">{selectedNft.name}</h4>
+                                    {selectedNft.collection && (
+                                        <p className="text-xs text-secondary truncate">{selectedNft.collection}</p>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2 mt-2">
+                                    <input
+                                        type="text"
+                                        value={recipient}
+                                        onChange={(e) => setRecipient(e.target.value)}
+                                        placeholder="Recipient wallet address..."
+                                        className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/30 focus:outline-none focus:border-lazor-neon/50 font-mono"
+                                    />
+
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => window.open(`https://explorer.solana.com/address/${selectedNft.mint}?cluster=devnet`, '_blank')}
+                                            className="flex-1 text-xs py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center justify-center gap-1"
+                                        >
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                                <polyline points="15 3 21 3 21 9"></polyline>
+                                                <line x1="10" y1="14" x2="21" y2="3"></line>
+                                            </svg>
+                                            View
+                                        </button>
+                                        <button
+                                            onClick={handleSendNft}
+                                            disabled={sending || !recipient}
+                                            className="flex-1 text-xs py-2 bg-lazor-neon text-black font-bold rounded-lg hover:bg-white transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                                        >
+                                            {sending ? (
+                                                <span className="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin"></span>
+                                            ) : (
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                                </svg>
+                                            )}
+                                            {sending ? 'Sending' : 'Send'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={() => setSelectedNft(null)}
+                                    className="absolute top-2 right-2 p-1 hover:bg-white/10 rounded-full transition-colors"
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* NFT Grid - Remaining NFTs */}
+                    <div className="grid grid-cols-3 gap-3">
+                        {orderedNfts.filter(n => n.id !== selectedNft?.id).map(nft => (
+                            <div
+                                key={nft.id}
+                                onClick={() => selectNft(nft)}
+                                className="group aspect-square rounded-xl overflow-hidden bg-black/40 border border-white/5 hover:border-lazor/50 transition-all cursor-pointer relative"
+                            >
                                 <img
                                     src={nft.image}
                                     alt={nft.name}
                                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                                     onError={(e) => { (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/fallback/300/300'; }}
                                 />
-                                {/* Hover Overlay with Send Button */}
-                                <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
-                                    <span className="text-xs font-medium text-center truncate w-full">{nft.name}</span>
-                                    <button
-                                        onClick={() => { setSendingId(nft.id); setRecipient(''); }}
-                                        className="bg-lazor-neon text-black text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-white transition-colors"
-                                    >
-                                        Send
-                                    </button>
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+                                    <span className="text-[10px] font-medium truncate w-full">{nft.name}</span>
                                 </div>
                             </div>
-
-                            {/* Inline Send Form (shows below NFT when selected) */}
-                            {sendingId === nft.id && (
-                                <div className="absolute left-0 right-0 top-full mt-2 bg-[#1a1b1f] border border-white/10 rounded-xl p-3 z-20 shadow-xl animate-fade-in">
-                                    <input
-                                        type="text"
-                                        value={recipient}
-                                        onChange={(e) => setRecipient(e.target.value)}
-                                        placeholder="Recipient address..."
-                                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/30 focus:outline-none focus:border-lazor-neon/50 font-mono mb-2"
-                                    />
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => setSendingId(null)}
-                                            className="flex-1 text-xs py-1.5 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={() => handleSendNft(nft)}
-                                            disabled={sending || !recipient}
-                                            className="flex-1 text-xs py-1.5 bg-lazor-neon text-black font-bold rounded-lg hover:bg-white transition-colors disabled:opacity-50"
-                                        >
-                                            {sending ? '...' : 'Confirm'}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             )}
         </div>
