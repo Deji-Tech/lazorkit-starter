@@ -69,7 +69,10 @@ export function GaslessTransfer() {
 
         } catch (e) {
             console.error('Airdrop failed', e);
-            alert('Airdrop failed. You might be rate-limited by Devnet.');
+            const useExternal = confirm('Devnet Airdrop failed (Rate Limited). Would you like to use the official Solana Faucet website instead?');
+            if (useExternal) {
+                window.open('https://faucet.solana.com/', '_blank');
+            }
         } finally {
             setAirdropLoading(false);
         }
