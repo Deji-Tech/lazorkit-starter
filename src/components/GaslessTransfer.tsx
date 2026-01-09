@@ -3,6 +3,7 @@ import { useWallet } from '@lazorkit/wallet';
 import { SystemProgram, PublicKey, LAMPORTS_PER_SOL, Connection, clusterApiUrl } from '@solana/web3.js';
 import { transactionStore } from '../utils/transactionStore';
 import { tokenStore } from '../utils/tokenStore';
+import { toast } from 'sonner';
 
 export function GaslessTransfer() {
     const { signAndSendTransaction, signMessage, smartWalletPubkey, isConnected } = useWallet();
@@ -24,17 +25,12 @@ export function GaslessTransfer() {
 
     const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
 
-    // Initial Load: Check if we have a balance in store. If 0 (default), fetch real.
+    // Initial Load: Sync Real Balance
     useEffect(() => {
         if (isConnected && smartWalletPubkey) {
             const currentStore = tokenStore.getAll().find(t => t.id === 'sol');
-            // If store is default (1.24 mock) or 0, fetch real to hydrate
-            // Ideally we always want to start fresh session with REAL balance if simulation hasn't run yet?
-            // But we want persistence. So we trust store unless it's the static default and real is different.
             connection.getBalance(smartWalletPubkey).then(lamports => {
                 const real = lamports / LAMPORTS_PER_SOL;
-                // If the store is the default mock value (1.24) and real is different, update it.
-                // Or if store is empty/zero and we have funds.
                 if ((currentStore?.balance === 1.24 && real !== 1.24) || (currentStore?.balance === 0 && real > 0)) {
                     tokenStore.updateBalance('sol', real);
                     setBalance(real);
@@ -43,7 +39,7 @@ export function GaslessTransfer() {
         }
     }, [isConnected, smartWalletPubkey]);
 
-    // Poll Store for UI (in case Swap changed it)
+    // Poll Store for UI
     useEffect(() => {
         const interval = setInterval(() => {
             const sol = tokenStore.getAll().find(t => t.id === 'sol');
@@ -57,22 +53,26 @@ export function GaslessTransfer() {
     const handleAirdrop = async () => {
         if (!smartWalletPubkey) return;
         setAirdropLoading(true);
+        const toastId = toast.loading('Requesting Devnet Airdrop...');
         try {
             const sig = await connection.requestAirdrop(smartWalletPubkey, 1 * LAMPORTS_PER_SOL);
             await connection.confirmTransaction(sig);
 
-            // Update Store with new Real Balance
             const newBal = await connection.getBalance(smartWalletPubkey);
             const val = newBal / LAMPORTS_PER_SOL;
             tokenStore.updateBalance('sol', val);
             setBalance(val);
-
+            toast.success('Airdrop Successful!', { id: toastId, description: '1 SOL added to your wallet.' });
         } catch (e) {
             console.error('Airdrop failed', e);
-            const useExternal = confirm('Devnet Airdrop failed (Rate Limited). Would you like to use the official Solana Faucet website instead?');
-            if (useExternal) {
-                window.open('https://faucet.solana.com/', '_blank');
-            }
+            toast.error('Airdrop Failed', {
+                id: toastId,
+                description: 'Devnet is rate-limited.',
+                action: {
+                    label: 'Use Faucet',
+                    onClick: () => window.open('https://faucet.solana.com/', '_blank')
+                }
+            });
         } finally {
             setAirdropLoading(false);
         }
@@ -80,18 +80,17 @@ export function GaslessTransfer() {
 
     const handleTestSign = async () => {
         if (!signMessage) {
-            alert('signMessage not supported by this wallet');
+            toast.error('Not Supported', { description: 'signMessage not supported by this wallet' });
             return;
         }
+        const toastId = toast.loading('Waiting for biometric signature...');
         try {
             setLoading(true);
-            const sig = await signMessage("Hello LazorKit!");
-            console.log('Message signed:', sig);
-            alert('SUCCESS: Message Signed! Passkey is working.');
+            await signMessage("Hello LazorKit!");
+            toast.success('Message Signed!', { id: toastId, description: 'Passkey authentication verified.' });
         } catch (e: any) {
             console.error('Sign message failed', e);
-            setFullError(JSON.stringify(e, Object.getOwnPropertyNames(e), 2));
-            alert('FAILED: Could not sign message. See debug info.');
+            toast.error('Signing Failed', { id: toastId, description: 'Signature rejected or timed out.' });
         } finally {
             setLoading(false);
         }
@@ -106,8 +105,9 @@ export function GaslessTransfer() {
         setFullError(null);
         setSignature(null);
 
+        const toastId = toast.loading(feeMode === 'paymaster' ? 'Sending Gasless Transaction...' : 'Sending Transaction...');
+
         try {
-            // Check Store Balance (Virtual)
             if (balance !== null && parseFloat(amount) > balance && feeMode === 'user') {
                 throw new Error('Insufficient funds (Simulated).');
             }
@@ -133,15 +133,10 @@ export function GaslessTransfer() {
                 transactionOptions: options
             });
 
-            console.log('Transaction confirmed:', sig);
-
-            // Deduct from Store manually to keep simulation in sync
-            // (Real balance also drops, but we update store eagerly)
             const newBal = balance - parseFloat(amount);
             tokenStore.updateBalance('sol', newBal);
             setBalance(newBal);
 
-            // SAVE TO HISTORY STORE
             transactionStore.add({
                 type: 'sent',
                 amount: amount,
@@ -152,11 +147,20 @@ export function GaslessTransfer() {
             });
 
             setSignature(sig);
+            toast.success('Transfer Successful!', {
+                id: toastId,
+                description: `Sent ${amount} SOL`,
+                action: {
+                    label: 'Explorer',
+                    onClick: () => window.open(`https://explorer.solana.com/tx/${sig}?cluster=devnet`, '_blank')
+                }
+            });
         } catch (err: any) {
             console.error('Transfer failed:', err);
             const msg = err.message || 'Transaction rejected';
             setErrorDescription(msg.includes('0x1') ? 'Insufficient funds' : msg);
             setFullError(JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
+            toast.error('Transfer Failed', { id: toastId, description: msg });
         } finally {
             setLoading(false);
         }
@@ -180,12 +184,16 @@ export function GaslessTransfer() {
                         <button
                             onClick={async () => {
                                 if (!smartWalletPubkey) return;
+                                const tId = toast.loading('Refreshing balance...');
                                 try {
                                     const lamports = await connection.getBalance(smartWalletPubkey);
                                     const val = lamports / LAMPORTS_PER_SOL;
                                     tokenStore.updateBalance('sol', val);
                                     setBalance(val);
-                                } catch (e) { console.error(e); }
+                                    toast.success('Balance Updated', { id: tId });
+                                } catch (e) {
+                                    toast.error('Refresh Failed', { id: tId });
+                                }
                             }}
                             className="hover:text-white transition-colors"
                             title="Refresh Balance"
@@ -209,7 +217,6 @@ export function GaslessTransfer() {
             </div>
 
             <form onSubmit={handleTransfer} className="space-y-6">
-                {/* Fee Mode Toggle */}
                 <div className="flex p-1 bg-black/40 rounded-lg border border-white/10">
                     <button
                         type="button"
@@ -265,8 +272,6 @@ export function GaslessTransfer() {
                                 <div className="opacity-90">{errorDescription}</div>
                             </div>
                         </div>
-
-                        {/* Debug Info Toggle */}
                         <details className="mt-2 text-xs">
                             <summary className="cursor-pointer opacity-70 hover:opacity-100">Show Debug Details</summary>
                             <pre className="mt-2 p-2 bg-black/50 rounded overflow-x-auto whitespace-pre-wrap font-mono opacity-80">
@@ -315,7 +320,6 @@ export function GaslessTransfer() {
                         Debug: Sign
                     </button>
                 </div>
-
                 {feeMode === 'paymaster' && (
                     <p className="text-center text-xs text-secondary">
                         No SOL required for fees. Sponsored by Paymaster.

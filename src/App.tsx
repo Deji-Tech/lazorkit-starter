@@ -108,10 +108,15 @@ function MainContent() {
   );
 }
 
+import { Toaster } from 'sonner';
+
+// ... MainContent function remains the same ...
+
 export default function App() {
   return (
     <LazorkitWrapper>
       <MainContent />
+      <Toaster position="bottom-right" theme="dark" richColors closeButton />
     </LazorkitWrapper>
   );
 }
